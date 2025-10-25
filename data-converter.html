@@ -2,245 +2,296 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Data Converter & Viewer</title>
+<title>Data Converter Tool</title>
 <style>
   body {
-    font-family: "Segoe UI", Roboto, sans-serif;
-    background: #f4f6f8;
+    font-family: Arial, sans-serif;
+    background: #f7f7f7;
     margin: 0;
     padding: 20px;
   }
   h1 {
     text-align: center;
-    color: #333;
   }
   textarea {
     width: 100%;
     height: 200px;
-    resize: vertical;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
+    margin-top: 10px;
     font-family: monospace;
+    font-size: 14px;
+    padding: 10px;
+    box-sizing: border-box;
   }
   .controls {
     display: flex;
-    flex-wrap: wrap;
     gap: 10px;
-    margin: 15px 0;
-    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
   }
-  button, select {
+  button {
     padding: 10px 15px;
+    background-color: #0078d7;
+    color: white;
     border: none;
     border-radius: 6px;
-    background: #4CAF50;
-    color: white;
     cursor: pointer;
-    font-weight: bold;
   }
-  button:hover, select:hover {
-    background: #45a049;
+  button:hover {
+    background-color: #005fa3;
   }
   #output {
     background: white;
-    padding: 15px;
-    border-radius: 8px;
     border: 1px solid #ccc;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    max-height: 500px;
+    padding: 10px;
+    margin-top: 10px;
     overflow: auto;
+    max-height: 400px;
+    white-space: pre-wrap;
+    font-family: monospace;
   }
-  .node { margin-left: 20px; }
-  .toggle {
+  .tree {
+    font-family: monospace;
+  }
+  .tree ul {
+    list-style-type: none;
+    padding-left: 20px;
+    margin: 0;
+  }
+  .tree li {
     cursor: pointer;
-    color: #007BFF;
+  }
+  .tree li::before {
+    content: "▶ ";
+    font-size: 12px;
+  }
+  .tree li.open::before {
+    content: "▼ ";
+  }
+  .tree ul.hidden {
+    display: none;
   }
 </style>
 </head>
 <body>
+  <h1>Data Converter</h1>
+  <textarea id="input" placeholder="Paste JSON, XML, or CSV data here..."></textarea>
 
-<h1>Data Converter & Viewer</h1>
+  <div class="controls">
+    <button onclick="convertTo('json')">To JSON</button>
+    <button onclick="convertTo('xml')">To XML</button>
+    <button onclick="convertTo('csv')">To CSV</button>
+    <button onclick="showTree()">Tree</button>
+    <button onclick="validateIndent()">Validate / Indent</button>
+    <button onclick="downloadFile()">Download</button>
+  </div>
 
-<textarea id="input" placeholder="Paste your JSON, CSV or XML here..."></textarea>
-
-<div class="controls">
-  <label>Convert to:</label>
-  <select id="format">
-    <option value="json">JSON</option>
-    <option value="csv">CSV</option>
-    <option value="xml">XML</option>
-  </select>
-  <button onclick="convertData()">Convert</button>
-  <button onclick="showTree()">Tree</button>
-  <button onclick="formatAndValidate()">Format & Validate</button>
-  <button onclick="downloadOutput()">Download</button>
-</div>
-
-<div id="output"></div>
+  <div id="output"></div>
 
 <script>
-// --- Format detection ---
+let currentFormat = '';
+
 function detectFormat(text) {
-  const t = text.trim();
-  if (t.startsWith("{") || t.startsWith("[")) return "json";
-  if (t.startsWith("<")) return "xml";
-  if (t.includes(",") && t.includes("\n")) return "csv";
-  return "unknown";
+  text = text.trim();
+  if (text.startsWith('{') || text.startsWith('[')) return 'json';
+  if (text.startsWith('<')) return 'xml';
+  if (text.includes(',') && text.includes('\n')) return 'csv';
+  return 'unknown';
 }
 
-// --- Conversions ---
-function csvToJson(csv) {
-  const [headerLine, ...lines] = csv.trim().split("\n");
-  const headers = headerLine.split(",");
-  return JSON.stringify(lines.map(line => {
-    const values = line.split(",");
-    const obj = {};
-    headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
-    return obj;
-  }), null, 2);
+function convertTo(format) {
+  const input = document.getElementById('input').value.trim();
+  let result = '';
+  try {
+    const inputFormat = detectFormat(input);
+    let data;
+
+    // Convert input to JSON object first
+    if (inputFormat === 'json') data = JSON.parse(input);
+    else if (inputFormat === 'xml') data = xmlToJson(new DOMParser().parseFromString(input, 'text/xml'));
+    else if (inputFormat === 'csv') data = csvToJson(input);
+    else throw new Error('Unrecognized input format.');
+
+    // Convert JSON object to desired output format
+    if (format === 'json') result = JSON.stringify(data, null, 2);
+    else if (format === 'xml') result = jsonToXml(data);
+    else if (format === 'csv') result = jsonToCsv(data);
+
+    document.getElementById('output').textContent = result;
+    currentFormat = format;
+  } catch (e) {
+    document.getElementById('output').textContent = 'Error: ' + e.message;
+  }
 }
 
-function jsonToCsv(json) {
-  const arr = JSON.parse(json);
-  if (!Array.isArray(arr)) throw new Error("JSON must be an array of objects.");
-  const headers = Object.keys(arr[0]);
-  const rows = arr.map(obj => headers.map(h => obj[h]).join(","));
-  return [headers.join(","), ...rows].join("\n");
+function validateIndent() {
+  const input = document.getElementById('input').value.trim();
+  try {
+    const format = detectFormat(input);
+    let data;
+    if (format === 'json') {
+      data = JSON.parse(input);
+      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      currentFormat = 'json';
+    } else if (format === 'xml') {
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(input, 'application/xml');
+      const serializer = new XMLSerializer();
+      document.getElementById('output').textContent = vkbeautify.xml(serializer.serializeToString(xml));
+      currentFormat = 'xml';
+    } else if (format === 'csv') {
+      data = csvToJson(input);
+      document.getElementById('output').textContent = jsonToCsv(data);
+      currentFormat = 'csv';
+    } else {
+      document.getElementById('output').textContent = 'Unknown format.';
+    }
+  } catch (e) {
+    document.getElementById('output').textContent = 'Invalid data: ' + e.message;
+  }
+}
+
+function showTree() {
+  const input = document.getElementById('input').value.trim();
+  try {
+    const format = detectFormat(input);
+    let data;
+    if (format === 'json') data = JSON.parse(input);
+    else if (format === 'xml') data = xmlToJson(new DOMParser().parseFromString(input, 'text/xml'));
+    else if (format === 'csv') data = csvToJson(input);
+    else throw new Error('Unknown format');
+
+    const tree = buildTree(data);
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+    output.appendChild(tree);
+    makeCollapsible(output);
+  } catch (e) {
+    document.getElementById('output').textContent = 'Error: ' + e.message;
+  }
 }
 
 function xmlToJson(xml) {
-  const parser = new DOMParser();
-  const dom = parser.parseFromString(xml, "application/xml");
-  function nodeToObject(node) {
-    if (node.nodeType === 3) return node.nodeValue.trim();
-    const obj = {};
-    node.childNodes.forEach(child => {
-      const val = nodeToObject(child);
-      if (child.nodeType !== 3 && child.nodeName) {
-        obj[child.nodeName] = val;
+  const obj = {};
+  if (xml.nodeType === 1) {
+    if (xml.attributes.length > 0) {
+      obj['@attributes'] = {};
+      for (let j = 0; j < xml.attributes.length; j++) {
+        const attribute = xml.attributes.item(j);
+        obj['@attributes'][attribute.nodeName] = attribute.nodeValue;
       }
-    });
-    return obj;
-  }
-  const result = {};
-  result[dom.documentElement.nodeName] = nodeToObject(dom.documentElement);
-  return JSON.stringify(result, null, 2);
-}
-
-function jsonToXml(json) {
-  const obj = JSON.parse(json);
-  function toXml(o, indent = "") {
-    return Object.entries(o).map(([k, v]) => {
-      if (typeof v === "object" && v !== null) {
-        return `${indent}<${k}>\n${toXml(v, indent + "  ")}${indent}</${k}>\n`;
+    }
+  } else if (xml.nodeType === 3) obj['#text'] = xml.nodeValue.trim();
+  if (xml.hasChildNodes()) {
+    for (let i = 0; i < xml.childNodes.length; i++) {
+      const item = xml.childNodes.item(i);
+      const nodeName = item.nodeName;
+      if (typeof obj[nodeName] === 'undefined') {
+        obj[nodeName] = xmlToJson(item);
       } else {
-        return `${indent}<${k}>${v}</${k}>\n`;
+        if (!Array.isArray(obj[nodeName])) obj[nodeName] = [obj[nodeName]];
+        obj[nodeName].push(xmlToJson(item));
       }
-    }).join("");
-  }
-  return toXml(obj);
-}
-
-// --- Convert action ---
-function convertData() {
-  const input = document.getElementById("input").value;
-  const output = document.getElementById("output");
-  const to = document.getElementById("format").value;
-  const from = detectFormat(input);
-  try {
-    let result = "";
-    if (from === to) {
-      result = input;
-    } else if (from === "csv" && to === "json") result = csvToJson(input);
-    else if (from === "json" && to === "csv") result = jsonToCsv(input);
-    else if (from === "xml" && to === "json") result = xmlToJson(input);
-    else if (from === "json" && to === "xml") result = jsonToXml(input);
-    else throw new Error("Unsupported conversion.");
-    output.textContent = result;
-  } catch (e) {
-    output.textContent = "❌ Error: " + e.message;
-  }
-}
-
-// --- Tree viewer ---
-function showTree() {
-  const input = document.getElementById("input").value.trim();
-  const output = document.getElementById("output");
-  try {
-    const format = detectFormat(input);
-    if (format === "json") {
-      output.innerHTML = renderCollapsible(JSON.parse(input));
-    } else if (format === "xml") {
-      output.textContent = new XMLSerializer().serializeToString(
-        new DOMParser().parseFromString(input, "application/xml")
-      );
-    } else {
-      output.textContent = "Tree view is only available for JSON or XML.";
-    }
-  } catch (e) {
-    output.textContent = "❌ Error rendering tree: " + e.message;
-  }
-}
-
-// --- Collapsible rendering for JSON ---
-function renderCollapsible(obj) {
-  if (typeof obj !== "object" || obj === null) return String(obj);
-  let html = "<ul>";
-  for (const key in obj) {
-    const value = obj[key];
-    if (typeof value === "object" && value !== null) {
-      html += `<li><span class="toggle" onclick="toggleNode(this)">[+]</span> <strong>${key}</strong>: <div class="node" style="display:none">${renderCollapsible(value)}</div></li>`;
-    } else {
-      html += `<li><strong>${key}</strong>: ${value}</li>`;
     }
   }
-  html += "</ul>";
-  return html;
+  return obj;
 }
 
-function toggleNode(el) {
-  const node = el.nextElementSibling.nextElementSibling;
-  const visible = node.style.display !== "none";
-  node.style.display = visible ? "none" : "block";
-  el.textContent = visible ? "[+]" : "[-]";
-}
-
-// --- Format & Validate ---
-function formatAndValidate() {
-  const input = document.getElementById("input").value.trim();
-  const output = document.getElementById("output");
-  try {
-    const format = detectFormat(input);
-    let formatted = "";
-    if (format === "json") {
-      formatted = JSON.stringify(JSON.parse(input), null, 2);
-    } else if (format === "xml") {
-      const xml = new DOMParser().parseFromString(input, "application/xml");
-      const parseError = xml.getElementsByTagName("parsererror");
-      if (parseError.length) throw new Error("Invalid XML structure.");
-      formatted = new XMLSerializer().serializeToString(xml);
-    } else if (format === "csv") {
-      formatted = input.trim();
-    } else throw new Error("Unknown format.");
-    output.textContent = "✅ Valid " + format.toUpperCase() + ":\n\n" + formatted;
-  } catch (e) {
-    output.textContent = "❌ Invalid data: " + e.message;
+function jsonToXml(obj, indent = '') {
+  let xml = '';
+  for (let prop in obj) {
+    if (prop === '@attributes') continue;
+    const value = obj[prop];
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        xml += indent + '<' + prop + jsonAttributes(obj['@attributes']) + '>\n';
+        xml += jsonToXml(value[i], indent + '  ');
+        xml += indent + '</' + prop + '>\n';
+      }
+    } else if (typeof value === 'object') {
+      xml += indent + '<' + prop + jsonAttributes(obj['@attributes']) + '>\n';
+      xml += jsonToXml(value, indent + '  ');
+      xml += indent + '</' + prop + '>\n';
+    } else {
+      xml += indent + '<' + prop + '>' + value + '</' + prop + '>\n';
+    }
   }
+  return xml;
 }
 
-// --- Download result ---
-function downloadOutput() {
-  const content = document.getElementById("output").textContent;
-  const blob = new Blob([content], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "output.txt";
-  a.click();
-  URL.revokeObjectURL(url);
+function jsonAttributes(attrs) {
+  if (!attrs) return '';
+  return ' ' + Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+}
+
+function csvToJson(csv) {
+  const lines = csv.split('\n');
+  const headers = lines[0].split(',');
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const obj = {};
+    const currentline = lines[i].split(',');
+    for (let j = 0; j < headers.length; j++) obj[headers[j]] = currentline[j];
+    result.push(obj);
+  }
+  return result;
+}
+
+function jsonToCsv(json) {
+  const array = Array.isArray(json) ? json : [json];
+  const headers = Object.keys(array[0]);
+  const csv = [headers.join(',')];
+  array.forEach(obj => csv.push(headers.map(h => obj[h]).join(',')));
+  return csv.join('\n');
+}
+
+function buildTree(obj) {
+  const ul = document.createElement('ul');
+  for (let key in obj) {
+    const li = document.createElement('li');
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      li.textContent = key;
+      li.classList.add('parent');
+      li.appendChild(buildTree(obj[key]));
+    } else {
+      li.textContent = key + ': ' + obj[key];
+    }
+    ul.appendChild(li);
+  }
+  return ul;
+}
+
+function makeCollapsible(container) {
+  const items = container.querySelectorAll('li.parent');
+  items.forEach(li => {
+    li.addEventListener('click', function (e) {
+      e.stopPropagation();
+      li.classList.toggle('open');
+      const childUl = li.querySelector('ul');
+      if (childUl) childUl.classList.toggle('hidden');
+    });
+  });
+}
+
+function downloadFile() {
+  const text = document.getElementById('output').textContent;
+  let blob, filename;
+  if (currentFormat === 'json') {
+    blob = new Blob([text], { type: 'application/json' });
+    filename = 'data.json';
+  } else if (currentFormat === 'xml') {
+    blob = new Blob([text], { type: 'application/xml' });
+    filename = 'data.xml';
+  } else if (currentFormat === 'csv') {
+    blob = new Blob([text], { type: 'text/csv' });
+    filename = 'data.csv';
+  } else {
+    blob = new Blob([text], { type: 'text/plain' });
+    filename = 'data.txt';
+  }
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
 }
 </script>
 </body>
