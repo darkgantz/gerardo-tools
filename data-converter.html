@@ -49,25 +49,31 @@
     white-space: pre-wrap;
     font-family: monospace;
   }
-  .tree {
-    font-family: monospace;
-  }
   .tree ul {
     list-style-type: none;
     padding-left: 20px;
     margin: 0;
   }
   .tree li {
+    position: relative;
     cursor: pointer;
+    padding-left: 14px;
   }
   .tree li::before {
-    content: "▶ ";
+    content: "▶";
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #666;
     font-size: 12px;
   }
   .tree li.open::before {
-    content: "▼ ";
+    content: "▼";
   }
-  .tree ul.hidden {
+  .tree li.leaf::before {
+    content: "";
+  }
+  .hidden {
     display: none;
   }
 </style>
@@ -136,7 +142,8 @@ function validateIndent() {
       const parser = new DOMParser();
       const xml = parser.parseFromString(input, 'application/xml');
       const serializer = new XMLSerializer();
-      document.getElementById('output').textContent = vkbeautify.xml(serializer.serializeToString(xml));
+      const formatted = serializer.serializeToString(xml).replace(/></g, '>\n<');
+      document.getElementById('output').textContent = formatted;
       currentFormat = 'xml';
     } else if (format === 'csv') {
       data = csvToJson(input);
@@ -160,36 +167,69 @@ function showTree() {
     else if (format === 'csv') data = csvToJson(input);
     else throw new Error('Unknown format');
 
-    const tree = buildTree(data);
+    const tree = document.createElement('div');
+    tree.className = 'tree';
+    tree.appendChild(buildTree(data));
+
     const output = document.getElementById('output');
     output.innerHTML = '';
     output.appendChild(tree);
-    makeCollapsible(output);
   } catch (e) {
     document.getElementById('output').textContent = 'Error: ' + e.message;
   }
 }
 
-function xmlToJson(xml) {
-  const obj = {};
-  if (xml.nodeType === 1) {
-    if (xml.attributes.length > 0) {
-      obj['@attributes'] = {};
-      for (let j = 0; j < xml.attributes.length; j++) {
-        const attribute = xml.attributes.item(j);
-        obj['@attributes'][attribute.nodeName] = attribute.nodeValue;
-      }
+function buildTree(obj) {
+  const ul = document.createElement('ul');
+  for (let key in obj) {
+    const li = document.createElement('li');
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      li.textContent = key;
+      li.appendChild(buildTree(obj[key]));
+    } else {
+      li.textContent = key + ': ' + obj[key];
+      li.classList.add('leaf');
     }
-  } else if (xml.nodeType === 3) obj['#text'] = xml.nodeValue.trim();
+    ul.appendChild(li);
+  }
+
+  // Make collapsible
+  ul.querySelectorAll(':scope > li:not(.leaf)').forEach(li => {
+    const childUl = li.querySelector('ul');
+    if (childUl) {
+      childUl.classList.add('hidden');
+      li.addEventListener('click', e => {
+        e.stopPropagation();
+        li.classList.toggle('open');
+        childUl.classList.toggle('hidden');
+      });
+    }
+  });
+
+  return ul;
+}
+
+function xmlToJson(xml) {
+  if (xml.nodeType === 3) return xml.nodeValue.trim();
+  const obj = {};
+  if (xml.attributes && xml.attributes.length > 0) {
+    obj['@attributes'] = {};
+    for (let j = 0; j < xml.attributes.length; j++) {
+      const attr = xml.attributes.item(j);
+      obj['@attributes'][attr.nodeName] = attr.nodeValue;
+    }
+  }
   if (xml.hasChildNodes()) {
     for (let i = 0; i < xml.childNodes.length; i++) {
       const item = xml.childNodes.item(i);
       const nodeName = item.nodeName;
-      if (typeof obj[nodeName] === 'undefined') {
-        obj[nodeName] = xmlToJson(item);
-      } else {
-        if (!Array.isArray(obj[nodeName])) obj[nodeName] = [obj[nodeName]];
-        obj[nodeName].push(xmlToJson(item));
+      const val = xmlToJson(item);
+      if (val !== '') {
+        if (obj[nodeName] === undefined) obj[nodeName] = val;
+        else {
+          if (!Array.isArray(obj[nodeName])) obj[nodeName] = [obj[nodeName]];
+          obj[nodeName].push(val);
+        }
       }
     }
   }
@@ -224,7 +264,7 @@ function jsonAttributes(attrs) {
 }
 
 function csvToJson(csv) {
-  const lines = csv.split('\n');
+  const lines = csv.split('\n').filter(l => l.trim() !== '');
   const headers = lines[0].split(',');
   const result = [];
   for (let i = 1; i < lines.length; i++) {
@@ -242,34 +282,6 @@ function jsonToCsv(json) {
   const csv = [headers.join(',')];
   array.forEach(obj => csv.push(headers.map(h => obj[h]).join(',')));
   return csv.join('\n');
-}
-
-function buildTree(obj) {
-  const ul = document.createElement('ul');
-  for (let key in obj) {
-    const li = document.createElement('li');
-    if (typeof obj[key] === 'object' && obj[key] !== null) {
-      li.textContent = key;
-      li.classList.add('parent');
-      li.appendChild(buildTree(obj[key]));
-    } else {
-      li.textContent = key + ': ' + obj[key];
-    }
-    ul.appendChild(li);
-  }
-  return ul;
-}
-
-function makeCollapsible(container) {
-  const items = container.querySelectorAll('li.parent');
-  items.forEach(li => {
-    li.addEventListener('click', function (e) {
-      e.stopPropagation();
-      li.classList.toggle('open');
-      const childUl = li.querySelector('ul');
-      if (childUl) childUl.classList.toggle('hidden');
-    });
-  });
 }
 
 function downloadFile() {
