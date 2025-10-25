@@ -22,7 +22,7 @@
   </style>
 </head>
 <body>
-  <h2>Diff compare estilo GitHub (lado a lado)</h2>
+  <h2>Text Compare</h2>
 
   <div class="controls">
     <button id="btnCompare">Compare</button>
@@ -44,27 +44,18 @@
   <div class="panel">
     <div class="col">
       <label><strong>Original (old)</strong></label>
-      <textarea id="oldText">// Escribe el código original aquí
-function hola() {
-  console.log("hola mundo");
-}
-</textarea>
+      <textarea id="oldText"></textarea>
     </div>
     <div class="col">
-      <label><strong>Modificado (new)</strong></label>
-      <textarea id="newText">// Escribe la versión modificada aquí
-function hola(nombre) {
-  if (!nombre) nombre = "mundo";
-  console.log("hola " + nombre);
-}
-</textarea>
+      <label><strong>Updated (new)</strong></label>
+      <textarea id="newText"></textarea>
     </div>
   </div>
 
   <div id="diffContainer"></div>
 
   <footer>
-    Basado en <a href="https://github.com/rtfpessoa/diff2html" target="_blank">diff2html</a> y <a href="https://github.com/kpdecker/jsdiff" target="_blank">jsdiff</a>.
+    <a href="https://sites.google.com/view/gerardotools" target="_blank">Gerardo Tools</a>
   </footer>
 
   <!-- libs (CDN) -->
