@@ -184,8 +184,19 @@ function buildTree(obj, expandAll = false) {
     const li = document.createElement('li');
     if (typeof obj[key] === 'object' && obj[key] !== null) {
       li.textContent = key;
-      li.appendChild(buildTree(obj[key], expandAll));
-      if (expandAll) li.classList.add('open'); // expand all
+      const childUl = buildTree(obj[key], expandAll);
+      li.appendChild(childUl);
+      li.classList.add('parent');
+      if (expandAll) {
+        li.classList.add('open');
+      } else {
+        childUl.classList.add('hidden'); // ocultar hijos si no expandAll
+      }
+      li.addEventListener('click', function(e) {
+        e.stopPropagation();
+        li.classList.toggle('open');
+        childUl.classList.toggle('hidden');
+      });
     } else {
       li.textContent = key + ': ' + obj[key];
       li.classList.add('leaf');
