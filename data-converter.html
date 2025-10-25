@@ -27,6 +27,7 @@
     gap: 10px;
     flex-wrap: wrap;
     margin-top: 10px;
+    justify-content: center; /* Centrar los botones */
   }
   button {
     padding: 10px 15px;
@@ -73,9 +74,6 @@
   .tree li.leaf::before {
     content: "";
   }
-  .hidden {
-    display: none;
-  }
 </style>
 </head>
 <body>
@@ -104,20 +102,18 @@ function detectFormat(text) {
   return 'unknown';
 }
 
+// Conversion functions
 function convertTo(format) {
   const input = document.getElementById('input').value.trim();
   let result = '';
   try {
     const inputFormat = detectFormat(input);
     let data;
-
-    // Convert input to JSON object first
     if (inputFormat === 'json') data = JSON.parse(input);
     else if (inputFormat === 'xml') data = xmlToJson(new DOMParser().parseFromString(input, 'text/xml'));
     else if (inputFormat === 'csv') data = csvToJson(input);
     else throw new Error('Unrecognized input format.');
 
-    // Convert JSON object to desired output format
     if (format === 'json') result = JSON.stringify(data, null, 2);
     else if (format === 'xml') result = jsonToXml(data);
     else if (format === 'csv') result = jsonToCsv(data);
@@ -129,6 +125,7 @@ function convertTo(format) {
   }
 }
 
+// Validate / Indent
 function validateIndent() {
   const input = document.getElementById('input').value.trim();
   try {
@@ -157,6 +154,7 @@ function validateIndent() {
   }
 }
 
+// Tree view
 function showTree() {
   const input = document.getElementById('input').value.trim();
   try {
@@ -169,7 +167,7 @@ function showTree() {
 
     const tree = document.createElement('div');
     tree.className = 'tree';
-    tree.appendChild(buildTree(data));
+    tree.appendChild(buildTree(data, true)); // expandAll = true
 
     const output = document.getElementById('output');
     output.innerHTML = '';
@@ -179,36 +177,25 @@ function showTree() {
   }
 }
 
-function buildTree(obj) {
+// Build tree
+function buildTree(obj, expandAll = false) {
   const ul = document.createElement('ul');
   for (let key in obj) {
     const li = document.createElement('li');
     if (typeof obj[key] === 'object' && obj[key] !== null) {
       li.textContent = key;
-      li.appendChild(buildTree(obj[key]));
+      li.appendChild(buildTree(obj[key], expandAll));
+      if (expandAll) li.classList.add('open'); // expand all
     } else {
       li.textContent = key + ': ' + obj[key];
       li.classList.add('leaf');
     }
     ul.appendChild(li);
   }
-
-  // Make collapsible
-  ul.querySelectorAll(':scope > li:not(.leaf)').forEach(li => {
-    const childUl = li.querySelector('ul');
-    if (childUl) {
-      childUl.classList.add('hidden');
-      li.addEventListener('click', e => {
-        e.stopPropagation();
-        li.classList.toggle('open');
-        childUl.classList.toggle('hidden');
-      });
-    }
-  });
-
   return ul;
 }
 
+// Helper functions
 function xmlToJson(xml) {
   if (xml.nodeType === 3) return xml.nodeValue.trim();
   const obj = {};
@@ -284,6 +271,7 @@ function jsonToCsv(json) {
   return csv.join('\n');
 }
 
+// Download
 function downloadFile() {
   const text = document.getElementById('output').textContent;
   let blob, filename;
