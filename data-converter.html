@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Converter & Formatter</title>
+<style>
+  body {
+    font-family: "Segoe UI", Roboto, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    color: #333;
+  }
+  textarea {
+    width: 100%;
+    height: 200px;
+    resize: vertical;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-family: monospace;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 15px 0;
+    justify-content: center;
+  }
+  button, select {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button:hover, select:hover {
+    background: #45a049;
+  }
+  #output {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 500px;
+    overflow: auto;
+  }
+  .node { margin-left: 20px; }
+  .toggle {
+    cursor: pointer;
+    color: #007BFF;
+  }
+</style>
+</head>
+<body>
+
+<h1>Data Converter & Formatter</h1>
+
+<textarea id="input" placeholder="Pega aquí tu JSON, CSV o XML..."></textarea>
+
+<div class="controls">
+  <label>Convertir a:</label>
+  <select id="format">
+    <option value="json">JSON</option>
+    <option value="csv">CSV</option>
+    <option value="xml">XML</option>
+  </select>
+  <button onclick="convertData()">Convertir</button>
+  <button onclick="formatData()">Format / Beautify</button>
+  <button onclick="downloadOutput()">Descargar</button>
+</div>
+
+<div id="output"></div>
+
+<script>
+// --- Conversión entre formatos ---
+function csvToJson(csv) {
+  const [headerLine, ...lines] = csv.trim().split("\n");
+  const headers = headerLine.split(",");
+  return JSON.stringify(lines.map(line => {
+    const values = line.split(",");
+    const obj = {};
+    headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+    return obj;
+  }), null, 2);
+}
+
+function jsonToCsv(json) {
+  const arr = JSON.parse(json);
+  if (!Array.isArray(arr)) throw new Error("JSON debe ser un array de objetos.");
+  const headers = Object.keys(arr[0]);
+  const rows = arr.map(obj => headers.map(h => obj[h]).join(","));
+  return [headers.join(","), ...rows].join("\n");
+}
+
+function xmlToJson(xml) {
+  const parser = new DOMParser();
+  const dom = parser.parseFromString(xml, "application/xml");
+  function nodeToObject(node) {
+    if (node.nodeType === 3) return node.nodeValue.trim();
+    const obj = {};
+    node.childNodes.forEach(child => {
+      const val = nodeToObject(child);
+      if (child.nodeType !== 3 && child.nodeName) {
+        obj[child.nodeName] = val;
+      }
+    });
+    return obj;
+  }
+  const result = {};
+  result[dom.documentElement.nodeName] = nodeToObject(dom.documentElement);
+  return JSON.stringify(result, null, 2);
+}
+
+function jsonToXml(json) {
+  const obj = JSON.parse(json);
+  function toXml(o, indent = "") {
+    return Object.entries(o).map(([k, v]) => {
+      if (typeof v === "object" && v !== null) {
+        return `${indent}<${k}>\n${toXml(v, indent + "  ")}${indent}</${k}>\n`;
+      } else {
+        return `${indent}<${k}>${v}</${k}>\n`;
+      }
+    }).join("");
+  }
+  return toXml(obj);
+}
+
+// --- Funciones principales ---
+function detectFormat(text) {
+  const t = text.trim();
+  if (t.startsWith("{") || t.startsWith("[")) return "json";
+  if (t.startsWith("<")) return "xml";
+  if (t.includes(",") && t.includes("\n")) return "csv";
+  return "unknown";
+}
+
+function convertData() {
+  const input = document.getElementById("input").value;
+  const output = document.getElementById("output");
+  const to = document.getElementById("format").value;
+  const from = detectFormat(input);
+  try {
+    let result = "";
+    if (from === to) {
+      result = input;
+    } else if (from === "csv" && to === "json") result = csvToJson(input);
+    else if (from === "json" && to === "csv") result = jsonToCsv(input);
+    else if (from === "xml" && to === "json") result = xmlToJson(input);
+    else if (from === "json" && to === "xml") result = jsonToXml(input);
+    else throw new Error("Conversión no soportada.");
+    output.textContent = result;
+  } catch (e) {
+    output.textContent = "❌ Error: " + e.message;
+  }
+}
+
+function formatData() {
+  const input = document.getElementById("input").value.trim();
+  const output = document.getElementById("output");
+  try {
+    const format = detectFormat(input);
+    if (format === "json") {
+      output.innerHTML = renderCollapsible(JSON.parse(input));
+    } else if (format === "xml") {
+      output.textContent = new XMLSerializer().serializeToString(
+        new DOMParser().parseFromString(input, "application/xml")
+      );
+    } else {
+      output.textContent = input;
+    }
+  } catch (e) {
+    output.textContent = "❌ Error al formatear: " + e.message;
+  }
+}
+
+// --- Render JSON colapsable ---
+function renderCollapsible(obj) {
+  if (typeof obj !== "object" || obj === null) return String(obj);
+  let html = "<ul>";
+  for (const key in obj) {
+    const value = obj[key];
+    if (typeof value === "object" && value !== null) {
+      html += `<li><span class="toggle" onclick="toggleNode(this)">[+]</span> <strong>${key}</strong>: <div class="node" style="display:none">${renderCollapsible(value)}</div></li>`;
+    } else {
+      html += `<li><strong>${key}</strong>: ${value}</li>`;
+    }
+  }
+  html += "</ul>";
+  return html;
+}
+function toggleNode(el) {
+  const node = el.nextElementSibling.nextElementSibling;
+  const visible = node.style.display !== "none";
+  node.style.display = visible ? "none" : "block";
+  el.textContent = visible ? "[+]" : "[-]";
+}
+
+// --- Descargar ---
+function downloadOutput() {
+  const content = document.getElementById("output").textContent;
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "output.txt";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
