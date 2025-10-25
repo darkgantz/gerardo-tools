@@ -74,22 +74,25 @@
   .tree li.leaf::before {
     content: "";
   }
+  .hidden {
+    display: none;
+  }
 </style>
 </head>
 <body>
-  <h1>Data Converter</h1>
-  <textarea id="input" placeholder="Paste JSON, XML, or CSV data here..."></textarea>
+<h1>Data Converter</h1>
+<textarea id="input" placeholder="Paste JSON, XML, or CSV data here..."></textarea>
 
-  <div class="controls">
-    <button onclick="convertTo('json')">To JSON</button>
-    <button onclick="convertTo('xml')">To XML</button>
-    <button onclick="convertTo('csv')">To CSV</button>
-    <button onclick="showTree()">Tree</button>
-    <button onclick="validateIndent()">Validate / Indent</button>
-    <button onclick="downloadFile()">Download</button>
-  </div>
+<div class="controls">
+  <button onclick="convertTo('json')">To JSON</button>
+  <button onclick="convertTo('xml')">To XML</button>
+  <button onclick="convertTo('csv')">To CSV</button>
+  <button onclick="showTree()">Tree</button>
+  <button onclick="validateIndent()">Validate / Indent</button>
+  <button onclick="downloadFile()">Download</button>
+</div>
 
-  <div id="output"></div>
+<div id="output"></div>
 
 <script>
 let currentFormat = '';
@@ -177,7 +180,7 @@ function showTree() {
   }
 }
 
-// Build tree
+// Build tree function
 function buildTree(obj, expandAll = false) {
   const ul = document.createElement('ul');
   for (let key in obj) {
@@ -190,7 +193,7 @@ function buildTree(obj, expandAll = false) {
       if (expandAll) {
         li.classList.add('open');
       } else {
-        childUl.classList.add('hidden'); // ocultar hijos si no expandAll
+        childUl.classList.add('hidden');
       }
       li.addEventListener('click', function(e) {
         e.stopPropagation();
