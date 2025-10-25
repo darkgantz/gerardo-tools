@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Diff GitHub-like (diff2html + jsdiff)</title>
+
+  <!-- diff2html CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
+
+  <!-- highlight.js (opcional: para resaltado de sintaxis en diff2html) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css"/>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 20px; }
+    .panel { display:flex; gap: 16px; margin-bottom: 12px; }
+    textarea { width: 100%; height: 200px; font-family: monospace; font-size: 13px; padding: 8px; box-sizing: border-box; }
+    .col { flex:1; display:flex; flex-direction:column; }
+    .controls { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    #diffContainer { margin-top: 18px; }
+    footer { margin-top: 18px; color:#666; font-size: 13px; }
+    @media (max-width:900px) { .panel { flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <h2>Diff compare estilo GitHub (lado a lado)</h2>
+
+  <div class="controls">
+    <button id="btnCompare">Compare</button>
+    <label>
+      <input type="checkbox" id="wordDiff"> Word diff
+    </label>
+    <label>
+      <input type="checkbox" id="drawFiles" checked> Show file list
+    </label>
+    <label>
+      <input type="checkbox" id="matchingLines" checked> Line matching
+    </label>
+    <select id="formatSelect">
+      <option value="side-by-side">Side by side</option>
+      <option value="line-by-line">Line by line</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <div class="col">
+      <label><strong>Original (old)</strong></label>
+      <textarea id="oldText">// Escribe el código original aquí
+function hola() {
+  console.log("hola mundo");
+}
+</textarea>
+    </div>
+    <div class="col">
+      <label><strong>Modificado (new)</strong></label>
+      <textarea id="newText">// Escribe la versión modificada aquí
+function hola(nombre) {
+  if (!nombre) nombre = "mundo";
+  console.log("hola " + nombre);
+}
+</textarea>
+    </div>
+  </div>
+
+  <div id="diffContainer"></div>
+
+  <footer>
+    Basado en <a href="https://github.com/rtfpessoa/diff2html" target="_blank">diff2html</a> y <a href="https://github.com/kpdecker/jsdiff" target="_blank">jsdiff</a>.
+  </footer>
+
+  <!-- libs (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/diff@5.1.0/dist/diff.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
+  <script>
+    // Atajo a las APIs
+    const { Diff } = window; // jsdiff from cdn.jsdelivr
+    const { Diff2Html } = window; // diff2html
+
+    const oldEl = document.getElementById('oldText');
+    const newEl = document.getElementById('newText');
+    const btn = document.getElementById('btnCompare');
+    const diffContainer = document.getElementById('diffContainer');
+
+    function makePatch(oldStr, newStr, oldName='a/file.js', newName='b/file.js') {
+      // createTwoFilesPatch(subjectA, subjectB, oldStr, newStr, oldHeader, newHeader)
+      return Diff.createTwoFilesPatch(oldName, newName, oldStr, newStr, '', '');
+    }
+
+    function renderDiff(patch, options = {}) {
+      const html = Diff2Html.html(patch, {
+        inputFormat: 'diff',
+        outputFormat: options.outputFormat || 'side-by-side',
+        drawFileList: options.drawFileList !== undefined ? options.drawFileList : true,
+        matching: options.matching ? 'lines' : 'none',
+        // cuanto más alto, mejor el pareo entre líneas (pero más costoso)
+        matchingMaxComparisons: 5000,
+        // mostrar word diff si corresponde
+        highlight: true,
+      });
+      diffContainer.innerHTML = html;
+      // inicializar highlight.js sobre los bloques generados
+      if (window.hljs) {
+        diffContainer.querySelectorAll('pre code').forEach((block) => {
+          try { window.hljs.highlightElement(block); } catch(e){/* noop */ }
+        });
+      }
+    }
+
+    btn.addEventListener('click', () => {
+      const oldStr = oldEl.value;
+      const newStr = newEl.value;
+      const patch = makePatch(oldStr, newStr);
+      const options = {
+        outputFormat: document.getElementById('formatSelect').value,
+        drawFileList: document.getElementById('drawFiles').checked,
+        matching: document.getElementById('matchingLines').checked,
+      };
+      renderDiff(patch, options);
+    });
+
+    // Autocompare inicial
+    btn.click();
+  </script>
+</body>
+</html>
