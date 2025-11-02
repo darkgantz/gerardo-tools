@@ -190,16 +190,25 @@ function buildTree(obj, expandAll = false) {
       const childUl = buildTree(obj[key], expandAll);
       li.appendChild(childUl);
       li.classList.add('parent');
+
+      // Inicialmente, todos los UL hijos ocultos
       if (expandAll) {
         li.classList.add('open');
+        childUl.style.display = 'block'; // mostrar al inicio
       } else {
-        childUl.classList.add('hidden');
+        childUl.style.display = 'none'; // ocultar si no expandAll
       }
+
       li.addEventListener('click', function(e) {
         e.stopPropagation();
         li.classList.toggle('open');
-        childUl.classList.toggle('hidden');
+        if (childUl.style.display === 'none') {
+          childUl.style.display = 'block';
+        } else {
+          childUl.style.display = 'none';
+        }
       });
+
     } else {
       li.textContent = key + ': ' + obj[key];
       li.classList.add('leaf');
