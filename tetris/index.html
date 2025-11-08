@@ -5,12 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tetris Móvil</title>
     <style>
-        /* ... (Estilos CSS omitidos por brevedad, son los mismos de las versiones anteriores) ... */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent; 
+            -webkit-tap-highlight-color: transparent; /* Elimina el recuadro azul al tocar en Android */
         }
 
         body {
@@ -21,35 +20,11 @@
             align-items: center;
             min-height: 100vh;
             overflow: hidden;
-            /* Se mantiene touch-action: manipulation en body */
+            /* CRUCIAL para el touch en móviles: evita que el navegador intente hacer scroll/zoom */
             touch-action: manipulation; 
         }
-        
-        /* ... (El resto de estilos de game-container, canvas, controls, etc.) ... */
 
-        .game-container {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-            padding: 20px;
-            max-width: 100vw;
-            /* QUITAMOS el touch-action: none aquí para evitar bloqueo global */
-        }
-        
-        canvas {
-            /* ... estilos ... */
-            display: block;
-            /* QUITAMOS el touch-action: none aquí también */
-        }
-        
-        .control-btn {
-            /* ... estilos ... */
-            touch-action: manipulation; 
-            /* ... estilos ... */
-        }
-
-        /* [RESTO DE ESTILOS] */
+        /* --- Estilos para la Pantalla de Inicio --- */
         #splash-screen {
             position: fixed;
             top: 0;
@@ -91,6 +66,12 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
             text-transform: uppercase;
         }
+
+        .play-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+        }
+        /* ----------------------------------------- */
         
         .game-container {
             display: none;
@@ -205,6 +186,7 @@
             align-items: center;
             justify-content: center;
             user-select: none;
+            /* CRUCIAL para los botones: permiten que el touch se registre sin problemas */
             touch-action: manipulation; 
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
@@ -258,6 +240,48 @@
             text-align: center;
             color: white;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .game-over-content h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .game-over-content p {
+            font-size: 20px;
+            margin: 10px 0;
+            opacity: 0.9;
+        }
+
+        .restart-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 25px;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .restart-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
         }
 
         .pause-btn {
@@ -280,10 +304,31 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
 
+        .pause-btn:active {
+            transform: scale(0.95);
+        }
+
         @media (max-width: 600px) {
+            .game-container {
+                padding: 10px;
+            }
+
+            .game-header {
+                gap: 15px;
+                padding: 10px 15px;
+            }
+
+            .stat-value {
+                font-size: 20px;
+            }
+
             .controls {
                 grid-template-columns: repeat(3, 60px);
                 grid-template-rows: repeat(2, 60px);
+            }
+
+            .control-btn {
+                font-size: 20px;
             }
         }
     </style>
@@ -378,23 +423,52 @@
         let dropInterval = 1000;
         let lastTime = 0;
 
-        // --- LÓGICA DE AUDIO (Simplificada) ---
         let audioContext = null; 
+
         function initAudio() {
+            // Inicializa el contexto de audio. Necesita una interacción de usuario previa (el clic de Play)
             if (!audioContext) {
                  audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
         }
-        function playSound() {}
-        function playMoveSound() {}
-        function playRotateSound() {}
-        function playLineSound() {}
-        function playGameOverSound() {}
-        function playLevelUpSound() {}
-        // --- FIN LÓGICA DE AUDIO ---
-        
-        // --- FUNCIONES DE JUEGO (Mantenidas) ---
-        function createPiece() { /* ... */
+
+        function playSound(frequency, duration, type = 'sine') {
+            if (!audioContext) return; 
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = frequency;
+            oscillator.type = type;
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playMoveSound() { playSound(200, 0.05); }
+        function playRotateSound() { playSound(300, 0.05); }
+        function playLineSound() {
+            playSound(440, 0.1);
+            setTimeout(() => playSound(550, 0.1), 100);
+            setTimeout(() => playSound(660, 0.15), 200);
+        }
+        function playGameOverSound() {
+            playSound(440, 0.2);
+            setTimeout(() => playSound(370, 0.2), 200);
+            setTimeout(() => playSound(330, 0.3), 400);
+        }
+        function playLevelUpSound() {
+            playSound(523, 0.1);
+            setTimeout(() => playSound(659, 0.1), 100);
+            setTimeout(() => playSound(784, 0.2), 200);
+        }
+
+        function createPiece() {
             const piece = PIECES[Math.floor(Math.random() * PIECES.length)];
             return {
                 shape: piece.shape.map(row => [...row]),
@@ -403,26 +477,274 @@
                 y: 0
             };
         }
-        function drawBlock(ctx, x, y, color) { /* ... */ }
-        function drawBoard() { /* ... */ }
-        function drawPiece(piece, context = ctx, offsetX = 0, offsetY = 0) { /* ... */ }
-        function drawNext() { /* ... */ }
-        function collide(piece) { /* ... */ }
-        function merge() { /* ... */ }
-        function rotate() { /* ... */ }
-        function clearLines() { /* ... */ }
-        function updateStats() { /* ... */ }
-        function moveDown() { /* ... */ }
-        function moveLeft() { /* ... */ }
-        function moveRight() { /* ... */ }
-        function hardDrop() { /* ... */ }
-        function endGame() { /* ... */ }
-        function resetGame() { /* ... */ }
-        function togglePause() { /* ... */ }
-        function update(time = 0) { /* ... */ }
+
+        function drawBlock(ctx, x, y, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+
+            const gradient = ctx.createLinearGradient(
+                x * BLOCK_SIZE, y * BLOCK_SIZE,
+                x * BLOCK_SIZE + BLOCK_SIZE, y * BLOCK_SIZE + BLOCK_SIZE
+            );
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        }
+
+        function drawBoard() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < ROWS; y++) {
+                for (let x = 0; x < COLS; x++) {
+                    if (board[y][x]) {
+                        drawBlock(ctx, x, y, board[y][x]);
+                    }
+                }
+            }
+        }
+
+        function drawPiece(piece, context = ctx, offsetX = 0, offsetY = 0) {
+            piece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        drawBlock(context, piece.x + x + offsetX, piece.y + y + offsetY, piece.color);
+                    }
+                });
+            });
+        }
+
+        function drawNext() {
+            nextCtx.fillStyle = '#000';
+            nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+
+            if (nextPiece) {
+                const blockSizeNext = 30; 
+                const offsetX = 2 - nextPiece.shape[0].length / 2;
+                const offsetY = 2 - nextPiece.shape.length / 2;
+                
+                nextPiece.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            nextCtx.fillStyle = nextPiece.color;
+                            nextCtx.fillRect((x + offsetX) * blockSizeNext, (y + offsetY) * blockSizeNext, blockSizeNext, blockSizeNext);
+                            
+                            nextCtx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                            nextCtx.lineWidth = 2;
+                            nextCtx.strokeRect((x + offsetX) * blockSizeNext, (y + offsetY) * blockSizeNext, blockSizeNext, blockSizeNext);
+                        }
+                    });
+                });
+            }
+        }
+
+        function collide(piece) {
+            for (let y = 0; y < piece.shape.length; y++) {
+                for (let x = 0; x < piece.shape[y].length; x++) {
+                    if (piece.shape[y][x]) {
+                        const newX = piece.x + x;
+                        const newY = piece.y + y;
+
+                        if (newX < 0 || newX >= COLS || newY >= ROWS) {
+                            return true;
+                        }
+
+                        if (newY >= 0 && board[newY][newX]) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function merge() {
+            currentPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        const boardY = currentPiece.y + y;
+                        const boardX = currentPiece.x + x;
+                        if (boardY >= 0) {
+                            board[boardY][boardX] = currentPiece.color;
+                        }
+                    }
+                });
+            });
+        }
+
+        function rotate() {
+            const rotated = currentPiece.shape[0].map((_, i) =>
+                currentPiece.shape.map(row => row[i]).reverse()
+            );
+
+            const previousShape = currentPiece.shape;
+            currentPiece.shape = rotated;
+
+            const offsets = [0, 1, -1, 2, -2];
+            for (let offset of offsets) {
+                currentPiece.x += offset;
+                if (!collide(currentPiece)) {
+                    playRotateSound();
+                    return;
+                }
+                currentPiece.x -= offset;
+            }
+            
+            currentPiece.shape = previousShape;
+        }
+
+
+        function clearLines() {
+            let linesCleared = 0;
+
+            for (let y = ROWS - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell !== 0)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(COLS).fill(0));
+                    linesCleared++;
+                    y++;
+                }
+            }
+
+            if (linesCleared > 0) {
+                playLineSound();
+                lines += linesCleared;
+                score += [0, 40, 100, 300, 1200][linesCleared] * level; 
+
+                const newLevel = Math.floor(lines / 10) + 1;
+                if (newLevel > level) {
+                    level = newLevel;
+                    dropInterval = Math.max(100, 1000 - (level - 1) * 100); 
+                    playLevelUpSound();
+                }
+
+                updateStats();
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('level').textContent = level;
+            document.getElementById('lines').textContent = lines;
+        }
+
+        function moveDown() {
+            currentPiece.y++;
+            if (collide(currentPiece)) {
+                currentPiece.y--;
+                merge();
+                clearLines();
+                currentPiece = nextPiece;
+                nextPiece = createPiece();
+                drawNext();
+
+                if (collide(currentPiece)) {
+                    endGame();
+                }
+                return true; 
+            }
+            return false; 
+        }
+
+        function moveLeft() {
+            currentPiece.x--;
+            if (collide(currentPiece)) {
+                currentPiece.x++;
+                return false;
+            } else {
+                playMoveSound();
+                return true;
+            }
+        }
+
+        function moveRight() {
+            currentPiece.x++;
+            if (collide(currentPiece)) {
+                currentPiece.x++;
+                return false;
+            } else {
+                playMoveSound();
+                return true;
+            }
+        }
+
+        function hardDrop() {
+            let yBefore = currentPiece.y;
+            while (!collide(currentPiece)) {
+                currentPiece.y++;
+            }
+            currentPiece.y--;
+            if (currentPiece.y > yBefore) {
+                playMoveSound();
+                moveDown(); 
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            playGameOverSound();
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalLevel').textContent = level;
+            document.getElementById('finalLines').textContent = lines;
+            document.getElementById('gameOverOverlay').classList.add('show');
+        }
+
+        function resetGame() {
+            board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+            score = 0;
+            level = 1;
+            lines = 0;
+            gameOver = false;
+            paused = false;
+            dropInterval = 1000;
+            currentPiece = createPiece();
+            nextPiece = createPiece();
+            updateStats();
+            drawNext();
+            document.getElementById('gameOverOverlay').classList.remove('show');
+            document.getElementById('pauseBtn').textContent = '⏸';
+        }
+
+        function togglePause() {
+            if (!gameOver) {
+                paused = !paused;
+                document.getElementById('pauseBtn').textContent = paused ? '▶' : '⏸';
+                if (!paused) {
+                    lastTime = performance.now(); 
+                    update(); 
+                }
+            }
+        }
+
+        function update(time = 0) {
+            if (gameOver || paused) {
+                return; 
+            }
+
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            dropCounter += deltaTime;
+
+            if (dropCounter > dropInterval) {
+                moveDown();
+                dropCounter = 0;
+            }
+
+            drawBoard();
+            drawPiece(currentPiece);
+
+            requestAnimationFrame(update);
+        }
+
+        // --- Lógica de Pantalla Completa (REVISADA) ---
         
-        // --- Lógica de Pantalla Completa ---
         function requestFullscreen(element) {
+            // Usa el prefijo webkit (para Chrome/Android) y la sintaxis estándar
             if (element.requestFullscreen) {
                 element.requestFullscreen();
             } else if (element.webkitRequestFullscreen) { 
@@ -435,57 +757,74 @@
         }
 
         playBtn.addEventListener('click', () => {
+            // Usa document.documentElement (el tag <html>) para máxima compatibilidad móvil.
             const rootElement = document.documentElement;
             requestFullscreen(rootElement); 
             
+            // Oculta la pantalla de inicio y muestra el juego
             splashScreen.classList.add('hidden');
             gameContainer.classList.add('visible');
 
+            // Inicializa el audio y el juego
             initAudio();
             resetGame();
             update();
         });
         
-        // --- MANEJO DE EVENTOS TÁCTILES SIMPLIFICADO (SOLO BOTONES) ---
+        // --- Manejo de Eventos Táctiles (CRUCIALES) ---
 
+        // Función genérica para manejar el "tap" y evitar problemas de eventos
         const handleTouchAction = (action) => (e) => {
-            // Este es el único lugar donde usamos e.preventDefault(), y solo en el evento touchstart
-            e.preventDefault(); 
+            e.preventDefault(); // IMPIDE que el navegador interprete el toque como scroll o zoom
             if (!gameOver && !paused) {
                 action();
             }
             e.target.blur(); 
         };
 
-        // Asignación de eventos touch a los botones:
-        document.getElementById('leftBtn').addEventListener('touchstart', handleTouchAction(moveLeft), { passive: false });
-        document.getElementById('rightBtn').addEventListener('touchstart', handleTouchAction(moveRight), { passive: false });
-        document.getElementById('downBtn').addEventListener('touchstart', handleTouchAction(hardDrop), { passive: false }); 
-        document.getElementById('rotateBtn').addEventListener('touchstart', handleTouchAction(rotate), { passive: false });
-
+        // Asignación de eventos touch:
+        
+        // Usamos touchstart para una respuesta instantánea en móviles (Chrome/Android)
+        document.getElementById('leftBtn').addEventListener('touchstart', handleTouchAction(moveLeft));
+        document.getElementById('rightBtn').addEventListener('touchstart', handleTouchAction(moveRight));
+        document.getElementById('downBtn').addEventListener('touchstart', handleTouchAction(hardDrop)); // Hard drop para el botón de abajo es lo usual
+        document.getElementById('rotateBtn').addEventListener('touchstart', handleTouchAction(rotate));
+        
+        // Mantenemos los eventos de click/mousedown como respaldo para otros contextos
+        document.getElementById('leftBtn').addEventListener('mousedown', handleTouchAction(moveLeft));
+        document.getElementById('rightBtn').addEventListener('mousedown', handleTouchAction(moveRight));
+        document.getElementById('downBtn').addEventListener('mousedown', handleTouchAction(hardDrop));
+        document.getElementById('rotateBtn').addEventListener('mousedown', handleTouchAction(rotate));
+        
+        // Controles de juego
         document.getElementById('pauseBtn').addEventListener('click', togglePause);
         document.getElementById('restartBtn').addEventListener('click', resetGame);
-        
-        // --- ELIMINACIÓN DE LÓGICA AGRESIVA DE SWIPE ---
-        // (touchmove, touchend y listeners del gameContainer eliminados para evitar conflictos)
 
-
-        // Control de teclado para escritorio
+        // Control de teclado para escritorio (si lo necesitas)
         document.addEventListener('keydown', (e) => {
             if (gameOver || paused) return;
 
             switch(e.key) {
                 case 'ArrowLeft':
+                    e.preventDefault(); 
+                    moveLeft();
+                    break;
                 case 'ArrowRight':
+                    e.preventDefault();
+                    moveRight();
+                    break;
                 case 'ArrowDown':
+                    e.preventDefault();
+                    moveDown();
+                    dropCounter = 0;
+                    break;
                 case 'ArrowUp':
+                    e.preventDefault();
+                    rotate();
+                    break;
                 case ' ':
                     e.preventDefault();
-                    if (e.key === 'ArrowLeft') moveLeft();
-                    else if (e.key === 'ArrowRight') moveRight();
-                    else if (e.key === 'ArrowDown') { moveDown(); dropCounter = 0; }
-                    else if (e.key === 'ArrowUp') rotate();
-                    else if (e.key === ' ') hardDrop();
+                    hardDrop();
                     break;
             }
         });
