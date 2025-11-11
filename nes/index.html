@@ -1,20 +1,3 @@
-<!--
-Simple NES emulator using jsnes (single-file, GitHub Pages ready)
-
-How to use:
-1) Create a new GitHub repo (public or private).
-2) Add this file as index.html at the repo root.
-3) Push to GitHub and enable GitHub Pages (Settings -> Pages -> Deploy from main branch).
-4) Open the GitHub Pages URL. You can load NES ROMs with the "Load ROM" button.
-
-Important legal note: This project uses the open-source jsnes library to emulate NES hardware.
-You MUST only load ROM files that you own or that are in the public domain / homebrew.
-Do NOT upload or distribute copyrighted Nintendo ROMs unless you hold the rights.
-
-If you want customization (UI, drag-and-drop, save states, controller support), tell me
-what you'd like and I can modify the single-file page.
--->
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -105,7 +88,7 @@ what you'd like and I can modify the single-file page.
   </div>
 
   <!-- jsnes is open-source — we load it from a CDN (unpkg). If you prefer, include it locally in the repo. -->
-  <script src="https://unpkg.com/jsnes@0.7.0/dist/jsnes.min.js"></script>
+  <script src="https://unpkg.com/jsnes/dist/jsnes.min.js"></script>
   <script>
     // Single-file browser NES demo using jsnes
     // NOTE: This code is intentionally compact and focused on functionality for GitHub Pages.
