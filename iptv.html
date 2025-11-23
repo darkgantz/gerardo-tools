@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player V9 - Scroll Fix Final</title>
+    <title>IPTV Player</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
@@ -38,9 +38,9 @@
         
         /* La corrección final del scroll */
         #channel-list { 
-            flex: 1; 
             overflow-y: auto; 
             min-height: 0; /* Solución para forzar el scroll en flexbox */
+            height: 100vh;
         }
         
         .channel { padding: 8px 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s; }
