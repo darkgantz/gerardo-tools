@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPTV Player Ultimate</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
+        body { font-family: sans-serif; background: var(--dark); color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Layout */
+        #sidebar { width: 320px; background: var(--sidebar); display: flex; flex-direction: column; border-right: 1px solid var(--border); flex-shrink: 0; }
+        #main { flex: 1; display: flex; flex-direction: column; background: #000; position: relative; }
+        
+        /* Componentes */
+        .panel { padding: 15px; border-bottom: 1px solid var(--border); background: #1a1a1a; }
+        input, select { width: 100%; padding: 10px; margin-bottom: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 4px; box-sizing: border-box; }
+        
+        .btn-row { display: flex; gap: 5px; margin-bottom: 5px; }
+        button { padding: 10px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; flex: 1; transition: 0.2s; }
+        .btn-play { background: var(--primary); } .btn-play:hover { background: #b0060f; }
+        .btn-add { background: #28a745; } .btn-add:hover { background: #1e7e34; }
+        .btn-del { background: #dc3545; max-width: 50px; } 
+        
+        /* Listas */
+        #channel-list { flex: 1; overflow-y: auto; }
+        .channel { padding: 10px 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; font-size: 14px; }
+        .channel:hover { background: #222; }
+        .channel.active { background: #333; border-left: 4px solid var(--primary); }
+        
+        /* Video */
+        video { width: 100%; height: 100%; }
+        #overlay { position: absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; background: rgba(0,0,0,0.5); }
+        
+        /* Utilidades */
+        .hidden { display: none !important; }
+        .badge { font-size: 10px; background: #333; padding: 2px 5px; border-radius: 3px; margin-left: auto; color: #aaa; }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    
+    <div id="panel-manager" class="panel">
+        <div style="font-size:12px; color:#888; margin-bottom:5px;">MIS LISTAS</div>
+        <div class="btn-row">
+            <select id="listSelect"></select>
+            <button class="btn-del" onclick="deleteList()">🗑️</button>
+        </div>
+        
+        <div class="btn-row">
+            <button class="btn-play" onclick="loadContent('SINGLE')">▶ Cargar</button>
+            <button class="btn-play" style="background:#555" onclick="loadContent('ALL')">★ Cargar Todo</button>
+        </div>
+        
+        <button class="btn-add" style="width:100%" onclick="toggleForm()">+ Nueva Lista</button>
+
+        <div id="form-add" class="hidden" style="margin-top:10px; padding-top:10px; border-top:1px solid #444;">
+            <input id="inpName" placeholder="Nombre Lista">
+            <input id="inpUrl" placeholder="URL https://...">
+            <button class="btn-add" style="width:100%" onclick="addList()">Guardar</button>
+        </div>
+    </div>
+
+    <div id="panel-channels" class="panel hidden" style="flex:1; padding:0; display:flex; flex-direction:column;">
+        <div style="padding:10px; background:#222;">
+            <button style="width:100%; background:#444" onclick="showManager()">⬅ Volver a Listas</button>
+            <input id="search" placeholder="🔍 Buscar canal..." onkeyup="renderChannels()" style="margin:10px 0 0 0;">
+        </div>
+        <div id="channel-list"></div>
+    </div>
+
+</div>
+
+<div id="main">
+    <video id="video" controls autoplay></video>
+    <div id="overlay">
+        <h2 id="status">Selecciona una lista</h2>
+    </div>
+</div>
+
+<script>
+    const DB_ID = "iptv_storage_v4_github"; 
+    let playlists = [];
+    let activeChannels = [];
+    let hls;
+    const video = document.getElementById('video');
+
+    // INICIO
+    window.onload = () => {
+        try {
+            let data = localStorage.getItem(DB_ID);
+            if(data) playlists = JSON.parse(data);
+        } catch(e) { console.error("Error leyendo memoria"); }
+        
+        if(playlists.length === 0) {
+            playlists.push({name: "Demo PlutoTV (HTTPS)", url: "https://i.mjh.nz/PlutoTV/ar.m3u8"});
+        }
+        
+        updateUI();
+    };
+
+    // GESTIÓN DE DATOS
+    function save() {
+        localStorage.setItem(DB_ID, JSON.stringify(playlists));
+        updateUI();
+    }
+
+    function updateUI() {
+        const sel = document.getElementById('listSelect');
+        sel.innerHTML = "";
+        playlists.forEach((l, i) => {
+            let opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = l.name;
+            sel.appendChild(opt);
+        });
+    }
+
+    function toggleForm() {
+        document.getElementById('form-add').classList.toggle('hidden');
+    }
+
+    function addList() {
+        const name = document.getElementById('inpName').value;
+        const url = document.getElementById('inpUrl').value;
+        
+        if(!url.startsWith('https')) return alert("Solo se permiten listas HTTPS");
+        if(name && url) {
+            playlists.push({name, url});
+            save();
+            document.getElementById('inpName').value = "";
+            document.getElementById('inpUrl').value = "";
+            toggleForm();
+        }
+    }
+
+    function deleteList() {
+        const idx = document.getElementById('listSelect').value;
+        if(confirm("¿Borrar lista?")) {
+            playlists.splice(idx, 1);
+            save();
+        }
+    }
+
+    // CARGA DE CONTENIDO
+    async function loadContent(mode) {
+        const status = document.getElementById('status');
+        status.innerText = "Cargando...";
+        activeChannels = [];
+
+        let urlsToLoad = [];
+        
+        if(mode === 'ALL') {
+            urlsToLoad = playlists.map(p => p.url);
+        } else {
+            const idx = document.getElementById('listSelect').value;
+            urlsToLoad = [playlists[idx].url];
+        }
+
+        // Descarga en paralelo
+        const promises = urlsToLoad.map(url => 
+            fetch('https://corsproxy.io/?' + encodeURIComponent(url))
+            .then(r => r.text())
+            .catch(e => "")
+        );
+
+        const results = await Promise.all(promises);
+        
+        results.forEach(txt => parseM3U(txt));
+
+        if(activeChannels.length > 0) {
+            document.getElementById('panel-manager').classList.add('hidden');
+            document.getElementById('panel-channels').classList.remove('hidden');
+            renderChannels();
+            status.style.display = 'none';
+        } else {
+            status.innerText = "No se encontraron canales HTTPS.";
+            alert("Error: Revisa que las listas funcionen y sean HTTPS.");
+        }
+    }
+
+    function parseM3U(data) {
+        const lines = data.split('\n');
+        let name = "";
+        
+        lines.forEach(line => {
+            line = line.trim();
+            if(line.startsWith('#EXTINF:')) {
+                name = line.split(',').pop().trim();
+            } else if(line.startsWith('https://') && name) {
+                activeChannels.push({name, url: line});
+                name = "";
+            }
+        });
+    }
+
+    function renderChannels() {
+        const term = document.getElementById('search').value.toLowerCase();
+        const container = document.getElementById('channel-list');
+        container.innerHTML = "";
+
+        const filtered = activeChannels.filter(c => c.name.toLowerCase().includes(term));
+
+        // Renderizar máximo 200 al principio para velocidad
+        filtered.slice(0, 200).forEach(ch => {
+            let div = document.createElement('div');
+            div.className = 'channel';
+            div.innerText = ch.name;
+            div.onclick = () => play(ch.url, div);
+            container.appendChild(div);
+        });
+    }
+
+    function showManager() {
+        document.getElementById('panel-channels').classList.add('hidden');
+        document.getElementById('panel-manager').classList.remove('hidden');
+    }
+
+    function play(url, el) {
+        document.querySelectorAll('.channel').forEach(c => c.classList.remove('active'));
+        el.classList.add('active');
+        
+        if(Hls.isSupported()) {
+            if(hls) hls.destroy();
+            hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+        } else if(video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = url;
+            video.play();
+        }
+    }
+</script>
+
+</body>
+</html>
