@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player V7 - Modal Fix</title>
+    <title>IPTV Player V8 - Scroll Fix</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
@@ -27,8 +27,21 @@
         .btn-del { background: #dc3545; max-width: 50px; font-size: 16px; } .btn-del:hover { background: #a71d2a; }
         .btn-back { background: #444; width: 100%; }
 
-        /* Lista de Canales */
-        #channel-list { flex: 1; overflow-y: auto; }
+        /* Lista de Canales (Contenedores) */
+        
+        /* 1. El contenedor del panel de canales debe ocupar el resto del espacio */
+        #panel-channels { 
+            flex: 1; /* Esto asegura que ocupe todo el espacio vertical restante del #sidebar */
+            display: flex !important; /* Asegurar que sea flex para sus hijos */
+            flex-direction: column; 
+            padding: 0 !important; /* Quitar padding para que #channel-list tenga más espacio */
+        } 
+        
+        /* 2. El listado de canales debe ocupar el resto del espacio y permitir scroll */
+        #channel-list { 
+            flex: 1; /* Ocupa el espacio restante dentro de #panel-channels */
+            overflow-y: auto; /* **LA CLAVE** para que funcione el scroll */
+        }
         
         .channel { padding: 8px 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s; }
         .channel:hover { background: #222; }
@@ -56,7 +69,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 1000; /* Debe estar por encima de todo */
+            z-index: 1000; 
         }
 
         .dialog-hidden {
@@ -122,7 +135,7 @@
         </div>
     </div>
 
-    <div id="panel-channels" class="hidden" style="flex:1; display:flex; flex-direction:column;">
+    <div id="panel-channels" class="hidden"> 
         <div style="padding:10px; background:#1a1a1a; border-bottom:1px solid #333;">
             <button class="btn-back" onclick="showManager()">⬅ Volver a Mis Listas</button>
             <input id="search" placeholder="🔍 Buscar canal..." onkeyup="renderChannels()" style="margin:10px 0 0 0;">
@@ -152,7 +165,7 @@
 
 <script>
     // CLAVE DE MEMORIA
-    const DB_ID = "iptv_v7_clean"; 
+    const DB_ID = "iptv_v8_scroll"; 
     
     let playlists = [];
     let activeChannels = [];
@@ -161,10 +174,6 @@
 
     // --- FUNCIONES DEL MODAL PERSONALIZADO ---
 
-    /**
-     * Muestra el modal de confirmación y devuelve una promesa.
-     * Resuelve a 'true' si se hace clic en Aceptar, 'false' si se hace clic en Cancelar.
-     */
     function showConfirm(message) {
         return new Promise(resolve => {
             const dialog = document.getElementById('custom-dialog');
@@ -185,7 +194,6 @@
             const okHandler = () => resolveAndHide(true);
             const cancelHandler = () => resolveAndHide(false);
 
-            // Se añaden los event listeners para resolver la promesa
             okBtn.addEventListener('click', okHandler);
             cancelBtn.addEventListener('click', cancelHandler);
         });
@@ -197,8 +205,6 @@
             let data = localStorage.getItem(DB_ID);
             if(data) playlists = JSON.parse(data);
         } catch(e) {}
-        
-        // **IMPORTANTE**: La lista demo por defecto se ha ELIMINADO.
         
         updateUI();
     };
@@ -229,7 +235,6 @@
             sel.appendChild(opt);
         });
 
-        // Lógica de selección post-borrado
         if (previousValue !== "" && playlists[previousValue]) {
             sel.value = previousValue;
         } else {
