@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player V8 - Scroll Fix</title>
+    <title>IPTV Player V9 - Scroll Fix Final</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
@@ -29,18 +29,18 @@
 
         /* Lista de Canales (Contenedores) */
         
-        /* 1. El contenedor del panel de canales debe ocupar el resto del espacio */
         #panel-channels { 
-            flex: 1; /* Esto asegura que ocupe todo el espacio vertical restante del #sidebar */
-            display: flex !important; /* Asegurar que sea flex para sus hijos */
+            flex: 1; 
+            display: flex !important; 
             flex-direction: column; 
-            padding: 0 !important; /* Quitar padding para que #channel-list tenga más espacio */
+            padding: 0 !important; 
         } 
         
-        /* 2. El listado de canales debe ocupar el resto del espacio y permitir scroll */
+        /* La corrección final del scroll */
         #channel-list { 
-            flex: 1; /* Ocupa el espacio restante dentro de #panel-channels */
-            overflow-y: auto; /* **LA CLAVE** para que funcione el scroll */
+            flex: 1; 
+            overflow-y: auto; 
+            min-height: 0; /* Solución para forzar el scroll en flexbox */
         }
         
         .channel { padding: 8px 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s; }
@@ -60,51 +60,18 @@
 
         /* --- ESTILO DEL MODAL PERSONALIZADO --- */
         #custom-dialog {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0, 0, 0, 0.75);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000; 
+            display: flex; justify-content: center; align-items: center; z-index: 1000; 
         }
-
-        .dialog-hidden {
-            display: none !important;
-        }
-
+        .dialog-hidden { display: none !important; }
         .dialog-content {
-            background: #1a1a1a;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-            width: 300px;
-            color: white;
-            border: 1px solid #444;
+            background: #1a1a1a; padding: 20px; border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5); width: 300px; color: white; border: 1px solid #444;
         }
-
-        #dialog-message {
-            margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1rem;
-        }
-
-        .dialog-buttons {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .dialog-buttons button {
-            padding: 8px 15px;
-            font-weight: normal;
-            flex: none; 
-            font-size: 14px;
-        }
-
+        #dialog-message { margin-top: 0; margin-bottom: 20px; font-size: 1rem; }
+        .dialog-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+        .dialog-buttons button { padding: 8px 15px; font-weight: normal; flex: none; font-size: 14px; }
         #dialog-ok { background: var(--primary); }
         #dialog-cancel { background: #444; }
     </style>
@@ -137,8 +104,7 @@
 
     <div id="panel-channels" class="hidden"> 
         <div style="padding:10px; background:#1a1a1a; border-bottom:1px solid #333;">
-            <button class="btn-back" onclick="showManager()">⬅ Volver a Mis Listas</button>
-            <input id="search" placeholder="🔍 Buscar canal..." onkeyup="renderChannels()" style="margin:10px 0 0 0;">
+            <input id="search" placeholder="🔍 Buscar canal..." onkeyup="renderChannels()" style="margin:0;">
         </div>
         <div id="channel-list"></div>
     </div>
@@ -165,7 +131,7 @@
 
 <script>
     // CLAVE DE MEMORIA
-    const DB_ID = "iptv_v8_scroll"; 
+    const DB_ID = "iptv_v9_scroll_final"; 
     
     let playlists = [];
     let activeChannels = [];
@@ -270,7 +236,7 @@
         loadContent('SINGLE');
     }
 
-    // --- BORRAR LISTA (CORREGIDO CON MODAL PERSONALIZADO) ---
+    // --- BORRAR LISTA (CON MODAL PERSONALIZADO) ---
     async function deleteList() {
         const sel = document.getElementById('listSelect');
         const idx = parseInt(sel.value); 
@@ -281,14 +247,13 @@
 
         const listName = playlists[idx].name;
 
-        // Utilizamos el modal personalizado
         const isConfirmed = await showConfirm(`¿Estás seguro de eliminar la lista: "${listName}"?`);
 
         if(isConfirmed) {
             playlists.splice(idx, 1); 
             save(true); 
             
-            // Si no quedan listas, volvemos a la vista de gestor
+            // Si no quedan listas, volvemos a la vista de gestor (pero sin el botón, solo recargará el estado)
             if (playlists.length === 0) {
                 showManager();
             }
