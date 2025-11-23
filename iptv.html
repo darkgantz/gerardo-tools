@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player V11 - Función Restaurada</title>
+    <title>IPTV Player V12 - CSS Optimizado</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
@@ -29,6 +29,7 @@
 
         /* Lista de Canales (Contenedores) */
         
+        /* El panel principal debe ocupar todo el espacio restante en el sidebar */
         #panel-channels { 
             flex: 1; 
             display: flex !important; 
@@ -36,10 +37,11 @@
             padding: 0 !important; 
         } 
         
+        /* El listado de canales (donde va el scroll) */
         #channel-list { 
-            flex: 1; 
             overflow-y: auto; 
             min-height: 0; 
+            height: 100vh;
         }
         
         .channel { padding: 8px 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s; }
@@ -131,7 +133,7 @@
 
 <script>
     // CLAVE DE MEMORIA
-    const DB_ID = "iptv_v11_fix"; 
+    const DB_ID = "iptv_v12_final"; 
     
     let playlists = [];
     let activeChannels = [];
@@ -292,8 +294,10 @@
         results.forEach(txt => parseM3U(txt));
 
         if(activeChannels.length > 0) {
+            // OCULTAR GESTOR y MOSTRAR CANALES
             document.getElementById('panel-manager').classList.add('hidden');
-            document.getElementById('panel-channels').classList.remove('hidden');
+            document.getElementById('panel-channels').classList.remove('hidden'); 
+            
             renderChannels();
             overlay.style.display = 'none';
         } else {
@@ -341,9 +345,9 @@
         });
     }
     
-    // --- FUNCIÓN showManager (CORREGIDA) ---
+    // --- FUNCIÓN showManager (Muestra el gestor y oculta los canales) ---
     function showManager() {
-        // Muestra el panel de gestión de listas
+        // OCULTAR CANALES y MOSTRAR GESTOR
         document.getElementById('panel-channels').classList.add('hidden');
         document.getElementById('panel-manager').classList.remove('hidden');
 
