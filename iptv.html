@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player V6 - Fixed Delete</title>
+    <title>IPTV Player V7 - Modal Fix</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
@@ -44,6 +44,56 @@
         
         /* Formulario Agregar */
         #form-add { border-top: 1px solid #444; padding-top: 10px; margin-top: 5px; }
+
+        /* --- ESTILO DEL MODAL PERSONALIZADO --- */
+        #custom-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000; /* Debe estar por encima de todo */
+        }
+
+        .dialog-hidden {
+            display: none !important;
+        }
+
+        .dialog-content {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            width: 300px;
+            color: white;
+            border: 1px solid #444;
+        }
+
+        #dialog-message {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .dialog-buttons button {
+            padding: 8px 15px;
+            font-weight: normal;
+            flex: none; 
+            font-size: 14px;
+        }
+
+        #dialog-ok { background: var(--primary); }
+        #dialog-cancel { background: #444; }
     </style>
 </head>
 <body>
@@ -85,18 +135,61 @@
 <div id="main">
     <video id="video" controls autoplay></video>
     <div id="overlay">
-        <div id="status-text">Selecciona una lista</div>
+        <div id="status-text">Selecciona una lista o agrega una nueva</div>
     </div>
 </div>
 
+<div id="custom-dialog" class="dialog-hidden">
+    <div class="dialog-content">
+        <p id="dialog-message">Mensaje de Confirmación</p>
+        <div class="dialog-buttons">
+            <button id="dialog-cancel">Cancelar</button>
+            <button id="dialog-ok">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+
 <script>
-    // CLAVE DE MEMORIA (Nueva clave para asegurar limpieza)
-    const DB_ID = "iptv_v6_fixed"; 
+    // CLAVE DE MEMORIA
+    const DB_ID = "iptv_v7_clean"; 
     
     let playlists = [];
     let activeChannels = [];
     let hls;
     const video = document.getElementById('video');
+
+    // --- FUNCIONES DEL MODAL PERSONALIZADO ---
+
+    /**
+     * Muestra el modal de confirmación y devuelve una promesa.
+     * Resuelve a 'true' si se hace clic en Aceptar, 'false' si se hace clic en Cancelar.
+     */
+    function showConfirm(message) {
+        return new Promise(resolve => {
+            const dialog = document.getElementById('custom-dialog');
+            const msgEl = document.getElementById('dialog-message');
+            const okBtn = document.getElementById('dialog-ok');
+            const cancelBtn = document.getElementById('dialog-cancel');
+            
+            msgEl.innerText = message;
+            dialog.classList.remove('dialog-hidden');
+
+            const resolveAndHide = (result) => {
+                dialog.classList.add('dialog-hidden');
+                okBtn.removeEventListener('click', okHandler);
+                cancelBtn.removeEventListener('click', cancelHandler);
+                resolve(result);
+            };
+
+            const okHandler = () => resolveAndHide(true);
+            const cancelHandler = () => resolveAndHide(false);
+
+            // Se añaden los event listeners para resolver la promesa
+            okBtn.addEventListener('click', okHandler);
+            cancelBtn.addEventListener('click', cancelHandler);
+        });
+    }
 
     // --- INICIO ---
     window.onload = () => {
@@ -105,11 +198,7 @@
             if(data) playlists = JSON.parse(data);
         } catch(e) {}
         
-        // Si no hay listas, agregamos una demo vacía o la de PlutoTV
-        if(playlists.length === 0) {
-            playlists.push({name: "Demo PlutoTV", url: "https://i.mjh.nz/PlutoTV/ar.m3u8"});
-            save(false); // Guardar sin refrescar UI todavía
-        }
+        // **IMPORTANTE**: La lista demo por defecto se ha ELIMINADO.
         
         updateUI();
     };
@@ -122,7 +211,6 @@
 
     function updateUI() {
         const sel = document.getElementById('listSelect');
-        // Guardamos el valor actual para intentar mantenerlo si no se borra
         const previousValue = sel.value; 
         
         sel.innerHTML = "";
@@ -141,11 +229,11 @@
             sel.appendChild(opt);
         });
 
-        // Lógica inteligente de selección post-borrado
+        // Lógica de selección post-borrado
         if (previousValue !== "" && playlists[previousValue]) {
             sel.value = previousValue;
         } else {
-            sel.value = 0; // Si el anterior ya no existe, ir al primero
+            sel.value = 0; 
         }
     }
 
@@ -162,40 +250,43 @@
         if(!name || !url) return alert("Completa los datos");
 
         playlists.push({name, url});
-        save(false); // Guardamos pero actualizamos UI manualmente abajo
+        save(false); 
 
         // Limpiar form
         document.getElementById('inpName').value = "";
         document.getElementById('inpUrl').value = "";
         document.getElementById('form-add').classList.add('hidden');
 
-        // Forzar selección de la nueva lista (la última)
         const newIndex = playlists.length - 1;
-        updateUI(); // Reconstruir select
-        document.getElementById('listSelect').value = newIndex; // Seleccionar la nueva
+        updateUI(); 
+        document.getElementById('listSelect').value = newIndex; 
 
         // Cargar
         loadContent('SINGLE');
     }
 
-    // --- BORRAR LISTA (CORREGIDO) ---
-    function deleteList() {
+    // --- BORRAR LISTA (CORREGIDO CON MODAL PERSONALIZADO) ---
+    async function deleteList() {
         const sel = document.getElementById('listSelect');
-        const idx = parseInt(sel.value); // Convertir a ENTERO es clave
+        const idx = parseInt(sel.value); 
 
-        // Validaciones de seguridad
         if (isNaN(idx) || idx < 0 || idx >= playlists.length) {
             return alert("No hay una lista válida seleccionada.");
         }
 
         const listName = playlists[idx].name;
 
-        if(confirm(`¿Estás seguro de eliminar la lista: "${listName}"?`)) {
-            playlists.splice(idx, 1); // Borrar del array
-            
-            // Guardamos y forzamos actualización de UI
-            // updateUI se encargará de seleccionar la lista 0 si la actual desaparece
+        // Utilizamos el modal personalizado
+        const isConfirmed = await showConfirm(`¿Estás seguro de eliminar la lista: "${listName}"?`);
+
+        if(isConfirmed) {
+            playlists.splice(idx, 1); 
             save(true); 
+            
+            // Si no quedan listas, volvemos a la vista de gestor
+            if (playlists.length === 0) {
+                showManager();
+            }
         }
     }
 
@@ -214,7 +305,11 @@
             urlsToLoad = playlists.map(p => p.url);
         } else {
             const idx = parseInt(document.getElementById('listSelect').value);
-            if (isNaN(idx) || !playlists[idx]) return alert("Selecciona una lista válida");
+            if (isNaN(idx) || !playlists[idx]) {
+                status.innerText = "Selecciona una lista válida.";
+                setTimeout(() => { overlay.style.display = 'none'; }, 2000);
+                return;
+            }
             urlsToLoad = [playlists[idx].url];
         }
 
@@ -268,7 +363,6 @@
             let div = document.createElement('div');
             div.className = 'channel';
             
-            // Logo con fallback
             let logoHTML = ch.logo ? 
                 `<img src="${ch.logo}" class="ch-logo" onerror="this.style.display='none'">` : '';
 
@@ -283,6 +377,11 @@
         document.getElementById('panel-manager').classList.remove('hidden');
         document.getElementById('overlay').style.display = 'flex';
         document.getElementById('status-text').innerText = "Selecciona una lista";
+        if (hls) {
+            hls.destroy();
+        }
+        video.pause();
+        video.src = "";
     }
 
     function play(url, el) {
@@ -296,6 +395,7 @@
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
         } else if(video.canPlayType('application/vnd.apple.mpegurl')) {
+            if(hls) hls.destroy();
             video.src = url;
             video.play();
         }
