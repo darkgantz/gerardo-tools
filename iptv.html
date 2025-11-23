@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player V10 - Back Button</title>
+    <title>IPTV Player V11 - Función Restaurada</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
@@ -36,11 +36,10 @@
             padding: 0 !important; 
         } 
         
-        /* La corrección del scroll (min-height: 0) */
         #channel-list { 
+            flex: 1; 
             overflow-y: auto; 
             min-height: 0; 
-            height: 100vh;
         }
         
         .channel { padding: 8px 15px; border-bottom: 1px solid #222; cursor: pointer; display: flex; align-items: center; font-size: 14px; transition: background 0.2s; }
@@ -132,7 +131,7 @@
 
 <script>
     // CLAVE DE MEMORIA
-    const DB_ID = "iptv_v10_final"; 
+    const DB_ID = "iptv_v11_fix"; 
     
     let playlists = [];
     let activeChannels = [];
@@ -341,12 +340,18 @@
             container.appendChild(div);
         });
     }
-
+    
+    // --- FUNCIÓN showManager (CORREGIDA) ---
     function showManager() {
+        // Muestra el panel de gestión de listas
         document.getElementById('panel-channels').classList.add('hidden');
         document.getElementById('panel-manager').classList.remove('hidden');
+
+        // Muestra el overlay de estado
         document.getElementById('overlay').style.display = 'flex';
         document.getElementById('status-text').innerText = "Selecciona una lista";
+        
+        // Detiene el reproductor
         if (hls) {
             hls.destroy();
         }
