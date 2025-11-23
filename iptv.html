@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player V12 - CSS Optimizado</title>
+    <title>IPTV Player</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root { --primary: #e50914; --dark: #121212; --sidebar: #000000; --border: #333; }
@@ -361,6 +361,8 @@
         }
         video.pause();
         video.src = "";
+        const container = document.getElementById('channel-list');
+        container.innerHTML = "";
     }
 
     function play(url, el) {
