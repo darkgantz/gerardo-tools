@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plant ID</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f7f6;
+    margin: 0;
+    padding: 0;
+  }
+
+  .app {
+    max-width: 420px;
+    margin: auto;
+    padding: 16px;
+  }
+
+  h1 {
+    text-align: center;
+    color: #2e7d32;
+  }
+
+  select, input, button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    font-size: 16px;
+  }
+
+  button {
+    background: #2e7d32;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    background: #9ccc9c;
+  }
+
+  .card {
+    background: white;
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+
+  .icon {
+    font-size: 18px;
+    margin-right: 6px;
+  }
+
+  .footer {
+    margin-top: 20px;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <h1 id="title">🌱 Identificador de Plantas</h1>
+
+  <select id="lang">
+    <option value="es">Español</option>
+    <option value="en">English</option>
+  </select>
+
+  <input id="plantInput" type="text" placeholder="Ej: Albahaca / Basil">
+
+  <button onclick="identifyPlant()" id="identifyBtn">
+    Identificar planta
+  </button>
+
+  <div id="result"></div>
+
+  <button id="shareBtn" style="display:none;" onclick="shareResult()">
+    Compartir
+  </button>
+
+  <div class="footer">
+    Datos de Wikidata y OpenFarm<br>
+    Resultado orientativo
+  </div>
+
+</div>
+
+<script>
+let lang = "es";
+let lastShareText = "";
+
+const texts = {
+  es: {
+    title: "🌱 Identificador de Plantas",
+    placeholder: "Ej: Albahaca / Basil",
+    identify: "Identificar planta",
+    water: "Riego",
+    sun: "Sol",
+    share: "Compartir",
+    notFound: "No se encontró información"
+  },
+  en: {
+    title: "🌱 Plant Identifier",
+    placeholder: "Ex: Basil",
+    identify: "Identify plant",
+    water: "Watering",
+    sun: "Sunlight",
+    share: "Share",
+    notFound: "Information not found"
+  }
+};
+
+document.getElementById("lang").addEventListener("change", e => {
+  lang = e.target.value;
+  updateTexts();
+});
+
+function updateTexts() {
+  document.getElementById("title").innerText = texts[lang].title;
+  document.getElementById("plantInput").placeholder = texts[lang].placeholder;
+  document.getElementById("identifyBtn").innerText = texts[lang].identify;
+  document.getElementById("shareBtn").innerText = texts[lang].share;
+}
+
+async function getFromWikidata(name) {
+  const query = `
+    SELECT ?itemLabel ?description WHERE {
+      ?item rdfs:label "${name}"@${lang}.
+      OPTIONAL {
+        ?item schema:description ?description.
+        FILTER(LANG(?description) = "${lang}")
+      }
+      SERVICE wikibase:label {
+        bd:serviceParam wikibase:language "${lang}".
+      }
+    }
+    LIMIT 1
+  `;
+
+  const url = "https://query.wikidata.org/sparql?format=json&query=" +
+              encodeURIComponent(query);
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (!data.results.bindings.length) return null;
+
+  const r = data.results.bindings[0];
+  return {
+    name: r.itemLabel.value,
+    description: r.description?.value || ""
+  };
+}
+
+async function getFromOpenFarm(slug) {
+  const res = await fetch(`https://openfarm.cc/api/v1/crops/${slug}`);
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  const a = data.data.attributes;
+
+  return {
+    water: a.watering || "",
+    sun: a.sun_requirements || ""
+  };
+}
+
+async function identifyPlant() {
+  const input = document.getElementById("plantInput").value.trim();
+  if (!input) return;
+
+  document.getElementById("result").innerHTML = "⏳ Buscando...";
+  document.getElementById("shareBtn").style.display = "none";
+
+  const wiki = await getFromWikidata(input);
+  const slug = input.toLowerCase().replace(/\s+/g, "-");
+  const farm = await getFromOpenFarm(slug);
+
+  if (!wiki && !farm) {
+    document.getElementById("result").innerText = texts[lang].notFound;
+    return;
+  }
+
+  const name = wiki?.name || input;
+  const description = wiki?.description || "";
+  const water = farm?.water || "—";
+  const sun = farm?.sun || "—";
+
+  document.getElementById("result").innerHTML = `
+    <div class="card">
+      <h2>🌿 ${name}</h2>
+      <p>${description}</p>
+      <p><span class="icon">💧</span><strong>${texts[lang].water}:</strong> ${water}</p>
+      <p><span class="icon">☀️</span><strong>${texts[lang].sun}:</strong> ${sun}</p>
+    </div>
+  `;
+
+  lastShareText = `🌱 ${name}
+
+${description}
+
+💧 ${texts[lang].water}: ${water}
+☀️ ${texts[lang].sun}: ${sun}`;
+
+  document.getElementById("shareBtn").style.display = "block";
+}
+
+function shareResult() {
+  if (navigator.share) {
+    navigator.share({
+      title: "Plant ID",
+      text: lastShareText
+    });
+  } else {
+    alert("Compartir no soportado en este navegador");
+  }
+}
+
+updateTexts();
+</script>
+
+</body>
+</html>
